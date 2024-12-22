@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Amazon Referral Link Manager",
+  "version": "1.0",
+  "description": "Replace Amazon referral links with your own",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*.amazon.com/*",
+    "*://*.amazon.in/*",
+    "*://*.amazon.co.uk/*",
+    "*://*.amazon.ca/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.amazon.com/*",
+        "*://*.amazon.in/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.ca/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [{
+    "resources": ["content.js"],
+    "matches": [
+      "*://*.amazon.com/*",
+      "*://*.amazon.in/*",
+      "*://*.amazon.co.uk/*",
+      "*://*.amazon.ca/*"
+    ]
+  }],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
