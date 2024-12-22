@@ -23,12 +23,12 @@
         "*://*.amazon.co.uk/*",
         "*://*.amazon.ca/*"
       ],
-      "js": ["content.js"],
+      "js": ["config.js", "content.js"],
       "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [{
-    "resources": ["content.js"],
+    "resources": ["content.js", "config.js"],
     "matches": [
       "*://*.amazon.com/*",
       "*://*.amazon.in/*",

@@ -1,23 +1,17 @@
-console.log('Content script loaded - Version 4');
+console.log('Content script loaded - Version 7');
 
 // Store the Associate ID globally
 let currentAssociateId = '';
-
-// Load saved Associate ID on script load
-chrome.storage.local.get(['associateId'], function(result) {
-    if (result.associateId) {
-        currentAssociateId = result.associateId;
-        console.log('Loaded Associate ID:', currentAssociateId);
-    }
-});
 
 // Function to check if URL has specific Associate ID
 function hasAssociateId(url, associateId) {
     try {
         const urlObj = new URL(url);
         const currentTag = urlObj.searchParams.get('tag');
+        console.log('Checking tag:', currentTag, 'against:', associateId);
         return currentTag === associateId;
     } catch (e) {
+        console.error('Error checking Associate ID:', e);
         return false;
     }
 }
@@ -45,33 +39,14 @@ function updateAmazonLink(url, associateId) {
             'pd_rd_i'  // Product ID
         ]);
         
-        // Parameters to explicitly remove
-        const removeParams = new Set([
-            'ref',     // Creator referral
-            'ref_',    // Additional referral
-            'linkCode',
-            'language',
-            'pd_rd_w',
-            'pd_rd_r',
-            'pf_rd_p',
-            'pf_rd_r',
-            'sprefix',
-            'crid',
-            '_encoding',
-            'linkId',
-            'initialIssue',
-            'pf_rd_s',
-            'pf_rd_t'
-        ]);
-        
         // Copy over only the essential parameters
         for (const [key, value] of existingParams.entries()) {
-            if (keepParams.has(key) && !removeParams.has(key)) {
+            if (keepParams.has(key)) {
                 newParams.set(key, value);
             }
         }
         
-        // Add your affiliate tag
+        // Add affiliate tag
         newParams.set('tag', associateId);
         
         // Reconstruct URL with only essential parameters
@@ -86,6 +61,8 @@ function updateAmazonLink(url, associateId) {
 
 // Function to update all Amazon links on the page
 function updateAllLinks(associateId) {
+    if (!associateId) return;
+    
     const links = document.getElementsByTagName('a');
     let replacedCount = 0;
 
@@ -98,59 +75,60 @@ function updateAllLinks(associateId) {
             }
         }
     }
-
-    return replacedCount;
-}
-
-// Function to handle link clicks
-function handleLinkClick(event) {
-    if (!currentAssociateId) return;
-
-    const link = event.target.closest('a');
-    if (!link || !link.href.includes('amazon')) return;
-
-    // Update the link before navigation
-    const updatedUrl = updateAmazonLink(link.href, currentAssociateId);
-    if (updatedUrl !== link.href) {
-        event.preventDefault();
-        window.location.href = updatedUrl;
-    }
-}
-
-// Add click listener to the document
-document.addEventListener('click', handleLinkClick, true);
-
-// Listen for messages from popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.log('Message received in content script:', request);
-
-    if (request.action === "checkReferral") {
-        const hasReferral = hasAssociateId(window.location.href, request.associateId);
-        sendResponse({hasReferral: hasReferral});
-    }
-    else if (request.action === "replaceAmazonLink") {
-        try {
-            // Store the Associate ID for future use
-            currentAssociateId = request.associateId;
-            
-            // Update the current page URL
-            const oldUrl = window.location.href;
-            const newUrl = updateAmazonLink(window.location.href, request.associateId);
-            console.log('Old URL:', oldUrl);
-            console.log('New URL:', newUrl);
-            
-            if (oldUrl !== newUrl) {
-                sendResponse({success: true, message: 'URL updated'});
-                window.location.href = newUrl;
-            } else {
-                // If URL didn't change, just process other links without refresh
-                const replacedCount = updateAllLinks(request.associateId);
-                console.log('Updated links count:', replacedCount);
-                sendResponse({success: true, count: replacedCount});
-            }
-        } catch (error) {
-            console.error('Error processing request:', error);
-            sendResponse({success: false, error: error.message});
+    
+    // If we're on an Amazon page, update the current URL
+    if (window.location.href.includes('amazon')) {
+        const currentUrl = window.location.href;
+        const newUrl = updateAmazonLink(currentUrl, associateId);
+        if (currentUrl !== newUrl) {
+            window.history.replaceState(null, '', newUrl);
         }
     }
+    
+    console.log(`Updated ${replacedCount} Amazon links`);
+}
+
+// Initialize: Load Associate ID and set up observers
+chrome.storage.local.get(['associateId'], function(result) {
+    if (result.associateId) {
+        currentAssociateId = result.associateId;
+        console.log('Loaded Associate ID:', currentAssociateId);
+        
+        // Update links immediately
+        updateAllLinks(currentAssociateId);
+        
+        // Set up a MutationObserver to handle dynamically added links
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.addedNodes.length) {
+                    updateAllLinks(currentAssociateId);
+                }
+            });
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
 });
+
+// Listen for messages from popup
+chrome.runtime.onMessage.addListener(
+    function(request, sender, sendResponse) {
+        console.log('Received message:', request);
+        
+        if (request.action === "updateAssociateId") {
+            currentAssociateId = request.associateId;
+            updateAllLinks(currentAssociateId);
+            sendResponse({status: "success"});
+        }
+        else if (request.action === "checkReferral") {
+            console.log('Checking referral for:', request.associateId);
+            const hasReferral = hasAssociateId(window.location.href, request.associateId);
+            console.log('Has referral:', hasReferral);
+            sendResponse({hasReferral: hasReferral});
+        }
+        return true; // Keep the message channel open for async response
+    }
+);

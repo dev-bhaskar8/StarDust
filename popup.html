@@ -13,11 +13,6 @@
       flex-direction: column;
       gap: 15px;
     }
-    input {
-      width: 100%;
-      padding: 8px;
-      box-sizing: border-box;
-    }
     button {
       padding: 10px;
       color: white;
@@ -25,11 +20,6 @@
       border-radius: 4px;
       cursor: pointer;
       font-weight: bold;
-    }
-    #replaceButton {
-      background-color: #ff9900;
-    }
-    #checkButton {
       background-color: #2196F3;
     }
     button:hover {
@@ -53,11 +43,10 @@
 </head>
 <body>
   <div class="container">
-    <input type="text" id="referralLink" placeholder="Enter your Amazon Associate ID">
-    <button id="replaceButton">Replace with My Referral</button>
     <button id="checkButton">Check Current Page</button>
     <div id="status"></div>
   </div>
+  <script src="config.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

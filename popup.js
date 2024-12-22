@@ -1,3 +1,6 @@
+// Load environment variables
+// const ASSOCIATE_ID = 'bhaskar0d0-21';
+
 // Function to send message to content script
 async function sendMessageToContentScript(message) {
     try {
@@ -16,14 +19,12 @@ async function sendMessageToContentScript(message) {
             return { success: false };
         }
 
-        // Create a promise that will reject after 5 seconds
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Message timeout')), 5000);
-        });
-
-        // Send message with timeout
-        const messagePromise = new Promise((resolve) => {
+        console.log('Sending message:', message);
+        
+        // Send message to content script
+        return new Promise((resolve) => {
             chrome.tabs.sendMessage(tab.id, message, (response) => {
+                console.log('Received response:', response);
                 if (chrome.runtime.lastError) {
                     console.error('Runtime error:', chrome.runtime.lastError);
                     resolve({ success: false, error: chrome.runtime.lastError });
@@ -32,117 +33,68 @@ async function sendMessageToContentScript(message) {
                 }
             });
         });
-
-        // Race between timeout and message
-        return await Promise.race([messagePromise, timeoutPromise])
-            .catch(async (error) => {
-                console.error('Error or timeout:', error);
-                
-                // If error, try reinjecting the content script
-                try {
-                    await chrome.scripting.executeScript({
-                        target: { tabId: tab.id },
-                        files: ['content.js']
-                    });
-                    
-                    // Try sending message again after reinjection
-                    return await new Promise((resolve) => {
-                        chrome.tabs.sendMessage(tab.id, message, (response) => {
-                            if (chrome.runtime.lastError) {
-                                resolve({ success: false, error: chrome.runtime.lastError });
-                            } else {
-                                resolve(response);
-                            }
-                        });
-                    });
-                } catch (retryError) {
-                    console.error('Retry failed:', retryError);
-                    updateStatus('Please refresh the Amazon page and try again');
-                    return { success: false };
-                }
-            });
     } catch (error) {
-        console.error('Error:', error);
-        updateStatus('An error occurred. Please try again.');
-        return { success: false };
+        console.error('Error sending message:', error);
+        updateStatus('Error: ' + error.message);
+        return { success: false, error: error };
     }
 }
 
 // Function to update status message
 function updateStatus(message, type = 'warning') {
-    const statusEl = document.getElementById('status');
-    if (statusEl) {
-        statusEl.style.display = 'block';
-        statusEl.textContent = message;
-        statusEl.className = type;
+    const status = document.getElementById('status');
+    status.textContent = message;
+    status.className = type;
+    status.style.display = 'block';
+    setTimeout(() => {
+        status.style.display = 'none';
+    }, 3000);
+}
+
+// Function to check if current page has our Associate ID
+async function checkCurrentPage() {
+    console.log('Checking current page...');
+    const response = await sendMessageToContentScript({
+        action: 'checkReferral',
+        associateId: window.appConfig.AMAZON_ASSOCIATE_ID
+    });
+
+    console.log('Check response:', response);
+    if (response && response.hasReferral) {
+        updateStatus('✓ Your referral is active on this page', 'success');
+    } else {
+        updateStatus('⚠ Your referral is not active on this page');
     }
 }
 
 // Function to initialize popup
 function initializePopup() {
-    const replaceButton = document.getElementById('replaceButton');
+    console.log('Initializing popup...');
     const checkButton = document.getElementById('checkButton');
-    const referralInput = document.getElementById('referralLink');
 
-    if (!replaceButton || !checkButton || !referralInput) {
-        console.error('Required elements not found');
+    if (!window.appConfig || !window.appConfig.AMAZON_ASSOCIATE_ID) {
+        console.error('Associate ID not configured');
+        updateStatus('Associate ID not configured');
         return;
     }
 
-    // Load saved Associate ID
-    chrome.storage.local.get(['associateId'], function(result) {
-        if (result.associateId && referralInput) {
-            referralInput.value = result.associateId;
-        }
+    // Save the Associate ID to storage
+    chrome.storage.local.set({ 
+        associateId: window.appConfig.AMAZON_ASSOCIATE_ID 
+    }, function() {
+        console.log('Associate ID saved:', window.appConfig.AMAZON_ASSOCIATE_ID);
     });
 
-    // Handle replace button click
-    replaceButton.addEventListener('click', async function() {
-        const associateId = referralInput.value.trim();
-        if (!associateId) {
-            updateStatus('Please enter your Amazon Associate ID');
-            return;
-        }
-        
-        // Save the Associate ID
-        chrome.storage.local.set({ associateId: associateId });
-        
-        updateStatus('Updating links...', 'warning');
-        const response = await sendMessageToContentScript({
-            action: "replaceAmazonLink",
-            associateId: associateId
-        });
-
-        if (response && response.success) {
-            if (response.message === 'URL updated') {
-                // Don't update status as page will refresh
-                return;
-            }
-            updateStatus(`Updated ${response.count || 0} links successfully!`, 'success');
-        } else {
-            updateStatus('Failed to update links. Please try again.');
-        }
+    // Add click event listener for check button
+    checkButton.addEventListener('click', () => {
+        console.log('Check button clicked');
+        checkCurrentPage();
     });
 
-    // Handle check button click
-    checkButton.addEventListener('click', async function() {
-        const associateId = referralInput.value.trim();
-        if (!associateId) {
-            updateStatus('Please enter your Amazon Associate ID');
-            return;
-        }
-
-        updateStatus('Checking referral...', 'warning');
-        const response = await sendMessageToContentScript({
-            action: "checkReferral",
-            associateId: associateId
-        });
-        
-        if (response && response.hasReferral) {
-            updateStatus('✓ Your referral is active on this page', 'success');
-        } else {
-            updateStatus('⚠ Your referral is not active on this page');
-        }
+    // Automatically update links when popup opens
+    sendMessageToContentScript({
+        action: 'updateAssociateId',
+        associateId: window.appConfig.AMAZON_ASSOCIATE_ID
     });
 }
 
