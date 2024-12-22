@@ -2,18 +2,20 @@
   "manifest_version": 3,
   "name": "Amazon Referral Link Manager",
   "version": "1.0",
-  "description": "Replace Amazon referral links with your own",
+  "description": "Amazon affiliate link manager with rewards system",
   "permissions": [
     "activeTab",
     "scripting",
     "storage",
-    "tabs"
+    "tabs",
+    "notifications"
   ],
   "host_permissions": [
     "*://*.amazon.com/*",
     "*://*.amazon.in/*",
     "*://*.amazon.co.uk/*",
-    "*://*.amazon.ca/*"
+    "*://*.amazon.ca/*",
+    "http://localhost:5001/*"
   ],
   "content_scripts": [
     {
@@ -27,14 +29,13 @@
       "run_at": "document_start"
     }
   ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "web_accessible_resources": [{
     "resources": ["content.js", "config.js"],
-    "matches": [
-      "*://*.amazon.com/*",
-      "*://*.amazon.in/*",
-      "*://*.amazon.co.uk/*",
-      "*://*.amazon.ca/*"
-    ]
+    "matches": ["<all_urls>"]
   }],
   "action": {
     "default_popup": "popup.html"

@@ -88,6 +88,34 @@ function updateAllLinks(associateId) {
     console.log(`Updated ${replacedCount} Amazon links`);
 }
 
+// Points System Integration
+function trackPurchase() {
+    // Only run on order confirmation pages
+    if (window.location.pathname.includes('/gp/buy/thankyou') || 
+        window.location.pathname.includes('/gp/buy/spc/thankyou')) {
+        
+        // Get order total
+        const orderTotalElement = document.querySelector('.grand-total-price');
+        if (orderTotalElement) {
+            const total = parseFloat(orderTotalElement.textContent.replace(/[^0-9.]/g, ''));
+            
+            // Send message to background script
+            chrome.runtime.sendMessage({
+                type: 'PURCHASE_COMPLETED',
+                data: {
+                    total: total,
+                    timestamp: Date.now()
+                }
+            });
+        }
+    }
+}
+
+// Add purchase tracking without affecting link conversion
+document.addEventListener('DOMContentLoaded', function() {
+    trackPurchase();
+});
+
 // Initialize: Load Associate ID and set up observers
 chrome.storage.local.get(['associateId'], function(result) {
     if (result.associateId) {
