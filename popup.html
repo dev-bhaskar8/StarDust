@@ -171,6 +171,7 @@
           <button id="loginBtn">Sign In</button>
         </div>
         <p>Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
+        <p><a href="#" id="showForgotPassword">Forgot Password?</a></p>
       </div>
       
       <!-- Signup form -->
@@ -182,6 +183,26 @@
           <button id="signupBtn">Create Account</button>
         </div>
         <p>Already have an account? <a href="#" id="showLogin">Sign in</a></p>
+      </div>
+
+      <!-- Forgot Password form -->
+      <div id="forgotPasswordForm" style="display: none;">
+        <h2>Reset Password</h2>
+        <div class="form-group">
+          <input type="email" id="forgotEmail" placeholder="Email" autocomplete="email">
+          <button id="resetBtn">Send Reset Link</button>
+        </div>
+        <p>Remember your password? <a href="#" id="backToLogin">Back to Login</a></p>
+      </div>
+
+      <!-- Reset Password form -->
+      <div id="resetPasswordForm" style="display: none;">
+        <h2>Set New Password</h2>
+        <div class="form-group">
+          <input type="password" id="newPassword" placeholder="New Password" autocomplete="new-password">
+          <input type="password" id="confirmPassword" placeholder="Confirm Password" autocomplete="new-password">
+          <button id="setPasswordBtn">Set New Password</button>
+        </div>
       </div>
     </div>
 
