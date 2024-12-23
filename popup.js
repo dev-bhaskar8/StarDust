@@ -7,6 +7,7 @@ const API_ENDPOINTS = {
     LOGIN: `${API_BASE}/auth/login`,
     SIGNUP: `${API_BASE}/auth/signup`,
     POINTS: `${API_BASE}/points`,
+    POINTS_ADD: `${API_BASE}/points/add`,
     FORGOT_PASSWORD: `${API_BASE}/auth/forgot-password`,
     RESET_PASSWORD: `${API_BASE}/auth/reset-password`
 };
@@ -47,6 +48,27 @@ function showSection(section) {
     else if (section === 'resetPassword') resetPasswordForm.style.display = 'block';
 }
 
+// Function to handle points addition
+function handlePointsAdd(authToken, points) {
+    return fetch(API_ENDPOINTS.POINTS_ADD, {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ points: points })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.points !== undefined) {
+            pointsValue.textContent = data.points;
+            return data;
+        } else {
+            throw new Error('No points value in response');
+        }
+    });
+}
+
 // Check current page for affiliate ID
 async function checkCurrentPage() {
     try {
@@ -56,17 +78,34 @@ async function checkCurrentPage() {
             return;
         }
 
+        console.log('Sending checkReferral message to tab:', tab.id);
         const response = await chrome.tabs.sendMessage(tab.id, {
             action: 'checkReferral',
             associateId: window.appConfig.AMAZON_ASSOCIATE_ID
         });
 
-        if (response && response.hasAffiliate) {
-            showStatus('\u2713 Your referral is active on this page');
+        console.log('Referral check response:', response);
+
+        if (response && response.hasReferral) {
+            chrome.storage.local.get(['authToken'], function(result) {
+                if (result.authToken) {
+                    handlePointsAdd(result.authToken, 1)
+                        .then(data => {
+                            showStatus('\u2713 Referral active! Added 1 point successfully.', false);
+                        })
+                        .catch(error => {
+                            console.error('Error adding points:', error);
+                            showStatus('Error adding points: ' + error.message, true);
+                        });
+                } else {
+                    showStatus('Please log in to add points', true);
+                }
+            });
         } else {
             showStatus('Affiliate ID is not present on this page', true);
         }
     } catch (error) {
+        console.error('Error in checkCurrentPage:', error);
         showStatus('Error checking page: ' + error.message, true);
     }
 }
@@ -167,13 +206,6 @@ async function sendMessageToContentScript(message) {
             return { success: false };
         }
 
-        // Check if URL is an Amazon URL
-        const url = new URL(tab.url);
-        if (!url.hostname.includes('amazon')) {
-            updateStatus('Please navigate to an Amazon page');
-            return { success: false };
-        }
-
         console.log('Sending message:', message);
         
         // Send message to content script
@@ -204,22 +236,6 @@ function updateStatus(message, type = 'warning') {
     setTimeout(() => {
         status.style.display = 'none';
     }, 3000);
-}
-
-// Function to check if current page has our Associate ID
-async function checkCurrentPage() {
-    console.log('Checking current page...');
-    const response = await sendMessageToContentScript({
-        action: 'checkReferral',
-        associateId: window.appConfig.AMAZON_ASSOCIATE_ID
-    });
-
-    console.log('Check response:', response);
-    if (response && response.hasReferral) {
-        updateStatus('\u2713 Your referral is active on this page', 'success');
-    } else {
-        updateStatus('\u26A0 Your referral is not active on this page');
-    }
 }
 
 // Forgot Password Functions
@@ -282,6 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (result.authToken) {
             showSection('main');
             loadUserData();
+            updateAssociateId();
         } else {
             showSection('login');
         }

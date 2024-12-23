@@ -237,41 +237,46 @@ def reset_password():
 @jwt_required()
 def get_points():
     try:
-        email = get_jwt_identity()
-        user = users.find_one({'email': email})
+        current_user = get_jwt_identity()
+        user = users.find_one({'email': current_user})
+        
         if not user:
             return jsonify({'message': 'User not found'}), 404
-        
+            
         return jsonify({'points': user.get('points', 0)}), 200
+        
     except Exception as e:
-        return jsonify({'message': f'Error: {str(e)}'}), 500
+        print(f"Error in get_points: {str(e)}")
+        return jsonify({'message': 'Internal server error'}), 500
 
 @app.route('/points/add', methods=['POST'])
 @jwt_required()
 def add_points():
     try:
-        email = get_jwt_identity()
+        current_user = get_jwt_identity()
         data = request.get_json()
-        points = data.get('points', 0)
-        
-        if points <= 0:
+        points_to_add = data.get('points', 0)
+
+        if not isinstance(points_to_add, (int, float)) or points_to_add <= 0:
             return jsonify({'message': 'Invalid points value'}), 400
-        
-        result = users.update_one(
-            {'email': email},
-            {'$inc': {'points': points}}
+
+        user = users.find_one({'email': current_user})
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+
+        current_points = user.get('points', 0)
+        new_points = current_points + points_to_add
+
+        users.update_one(
+            {'email': current_user},
+            {'$set': {'points': new_points}}
         )
-        
-        if result.modified_count == 0:
-            return jsonify({'message': 'Failed to update points'}), 400
-        
-        user = users.find_one({'email': email})
-        return jsonify({
-            'message': 'Points added successfully',
-            'points': user.get('points', 0)
-        }), 200
+
+        return jsonify({'points': new_points}), 200
+
     except Exception as e:
-        return jsonify({'message': f'Error: {str(e)}'}), 500
+        print(f"Error in add_points: {str(e)}")
+        return jsonify({'message': 'Internal server error'}), 500
 
 @app.route('/admin/points/<email>', methods=['GET'])
 def admin_get_points(email):

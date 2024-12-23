@@ -86,7 +86,7 @@
       display: none;
     }
 
-    .points-display {
+    .points-container {
       background: var(--card-bg);
       padding: 20px;
       border-radius: 12px;
@@ -157,6 +157,22 @@
       color: var(--error-color);
       border: 1px solid rgba(239, 68, 68, 0.2);
     }
+
+    /* Add points input styles */
+    .points-input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .points-input-group input {
+      flex: 1;
+      width: 80px;
+    }
+
+    .points-input-group button {
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -208,14 +224,14 @@
 
     <!-- Main content -->
     <div id="mainContent" style="display: none;">
-      <div class="points-display">
-        <div class="points-label">Your Points Balance</div>
+      <div class="points-container">
+        <div class="points-label">Points</div>
         <div class="points-value" id="pointsValue">0</div>
       </div>
 
       <div class="button-group">
-        <button id="checkButton">Check Current Page</button>
-        <button id="logoutBtn">Sign Out</button>
+        <button id="checkButton" class="primary-button">Check Current Page</button>
+        <button id="logoutBtn" class="secondary-button">Sign Out</button>
       </div>
     </div>
 

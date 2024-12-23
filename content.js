@@ -144,7 +144,7 @@ chrome.storage.local.get(['associateId'], function(result) {
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
-        console.log('Received message:', request);
+        console.log('Content script received message:', request);
         
         if (request.action === "updateAssociateId") {
             currentAssociateId = request.associateId;
@@ -153,9 +153,12 @@ chrome.runtime.onMessage.addListener(
         }
         else if (request.action === "checkReferral") {
             console.log('Checking referral for:', request.associateId);
-            const hasReferral = hasAssociateId(window.location.href, request.associateId);
+            const currentUrl = window.location.href;
+            console.log('Current URL:', currentUrl);
+            const hasReferral = hasAssociateId(currentUrl, request.associateId);
             console.log('Has referral:', hasReferral);
             sendResponse({hasReferral: hasReferral});
+            return true; // Keep the message channel open
         }
         return true; // Keep the message channel open for async response
     }
