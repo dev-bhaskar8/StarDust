@@ -150,7 +150,7 @@ def login():
     if not user or not bcrypt.checkpw(password.encode('utf-8'), user['password']):
         return jsonify({'message': 'Invalid email or password'}), 401
     
-    access_token = create_access_token(identity=str(user['_id']))
+    access_token = create_access_token(identity=email)
     return jsonify({
         'token': access_token,
         'points': user.get('points', 0)
@@ -237,8 +237,8 @@ def reset_password():
 @jwt_required()
 def get_points():
     try:
-        user_id = ObjectId(get_jwt_identity())
-        user = users.find_one({'_id': user_id})
+        email = get_jwt_identity()
+        user = users.find_one({'email': email})
         if not user:
             return jsonify({'message': 'User not found'}), 404
         
@@ -250,7 +250,7 @@ def get_points():
 @jwt_required()
 def add_points():
     try:
-        user_id = ObjectId(get_jwt_identity())
+        email = get_jwt_identity()
         data = request.get_json()
         points = data.get('points', 0)
         
@@ -258,16 +258,34 @@ def add_points():
             return jsonify({'message': 'Invalid points value'}), 400
         
         result = users.update_one(
-            {'_id': user_id},
+            {'email': email},
             {'$inc': {'points': points}}
         )
         
         if result.modified_count == 0:
             return jsonify({'message': 'Failed to update points'}), 400
         
-        user = users.find_one({'_id': user_id})
+        user = users.find_one({'email': email})
         return jsonify({
             'message': 'Points added successfully',
+            'points': user.get('points', 0)
+        }), 200
+    except Exception as e:
+        return jsonify({'message': f'Error: {str(e)}'}), 500
+
+@app.route('/admin/points/<email>', methods=['GET'])
+def admin_get_points(email):
+    try:
+        # Only allow access from localhost for security
+        if request.remote_addr not in ['127.0.0.1', 'localhost']:
+            return jsonify({'message': 'Access denied'}), 403
+            
+        user = users.find_one({'email': email})
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+        
+        return jsonify({
+            'email': email,
             'points': user.get('points', 0)
         }), 200
     except Exception as e:
