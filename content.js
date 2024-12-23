@@ -90,14 +90,12 @@ function updateAllLinks(associateId) {
 
 // Points System Integration
 function trackPurchase() {
-    // Only run on order confirmation pages
-    if (window.location.pathname.includes('/gp/buy/thankyou') || 
-        window.location.pathname.includes('/gp/buy/spc/thankyou')) {
-        
-        // Get order total
-        const orderTotalElement = document.querySelector('.grand-total-price');
-        if (orderTotalElement) {
-            const total = parseFloat(orderTotalElement.textContent.replace(/[^0-9.]/g, ''));
+    // Only run on shopping cart page
+    if (window.location.href.includes('/gp/buy/spc/handlers/display.html')) {
+        // Get order total from cart
+        const orderTotalElements = document.querySelectorAll('.grand-total-price');
+        if (orderTotalElements.length > 0) {
+            const total = parseFloat(orderTotalElements[orderTotalElements.length - 1].textContent.replace(/[^0-9.]/g, ''));
             
             // Send message to background script
             chrome.runtime.sendMessage({
@@ -109,6 +107,15 @@ function trackPurchase() {
             });
         }
     }
+}
+
+// Function to get cart total
+function getCartTotal() {
+    const totalElement = document.querySelector('.grand-total-price');
+    if (totalElement) {
+        return parseFloat(totalElement.textContent.replace(/[^0-9.]/g, ''));
+    }
+    return null;
 }
 
 // Add purchase tracking without affecting link conversion
@@ -142,24 +149,29 @@ chrome.storage.local.get(['associateId'], function(result) {
 });
 
 // Listen for messages from popup
-chrome.runtime.onMessage.addListener(
-    function(request, sender, sendResponse) {
-        console.log('Content script received message:', request);
-        
-        if (request.action === "updateAssociateId") {
-            currentAssociateId = request.associateId;
-            updateAllLinks(currentAssociateId);
-            sendResponse({status: "success"});
+chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+    if (message.action === 'updateAssociateId') {
+        currentAssociateId = message.associateId;
+        updateAllLinks(currentAssociateId);
+        sendResponse({status: "success"});
+    } else if (message.action === 'checkReferral') {
+        console.log('Checking referral for:', message.associateId);
+        const currentUrl = window.location.href;
+        console.log('Current URL:', currentUrl);
+        const hasReferral = hasAssociateId(currentUrl, message.associateId);
+        console.log('Has referral:', hasReferral);
+        sendResponse({hasReferral: hasReferral});
+        return true; // Keep the message channel open
+    } else if (message.type === 'SCAN_CART_PAGE') {
+        // Check if we're on the cart page and scan for total
+        const total = getCartTotal();
+        if (total) {
+            console.log('Cart total found:', total);
+            sendResponse({success: true, total: total});
+        } else {
+            console.log('No cart total found');
+            sendResponse({success: false});
         }
-        else if (request.action === "checkReferral") {
-            console.log('Checking referral for:', request.associateId);
-            const currentUrl = window.location.href;
-            console.log('Current URL:', currentUrl);
-            const hasReferral = hasAssociateId(currentUrl, request.associateId);
-            console.log('Has referral:', hasReferral);
-            sendResponse({hasReferral: hasReferral});
-            return true; // Keep the message channel open
-        }
-        return true; // Keep the message channel open for async response
     }
-);
+    return true; // Keep the message channel open for async response
+});

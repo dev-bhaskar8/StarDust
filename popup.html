@@ -79,11 +79,36 @@
     }
 
     #status {
-      margin-top: 10px;
+      margin-top: 15px;
       padding: 12px;
       border-radius: 8px;
       font-size: 14px;
       display: none;
+      text-align: center;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-5px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .success {
+      background-color: rgba(34, 197, 94, 0.1);
+      color: var(--success-color);
+      border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+
+    .error {
+      background-color: rgba(239, 68, 68, 0.1);
+      color: var(--error-color);
+      border: 1px solid rgba(239, 68, 68, 0.2);
     }
 
     .points-container {
@@ -144,18 +169,6 @@
 
     a:hover {
       text-decoration: underline;
-    }
-
-    .success {
-      background-color: rgba(34, 197, 94, 0.1);
-      color: var(--success-color);
-      border: 1px solid rgba(34, 197, 94, 0.2);
-    }
-
-    .error {
-      background-color: rgba(239, 68, 68, 0.1);
-      color: var(--error-color);
-      border: 1px solid rgba(239, 68, 68, 0.2);
     }
 
     /* Add points input styles */
@@ -225,17 +238,16 @@
     <!-- Main content -->
     <div id="mainContent" style="display: none;">
       <div class="points-container">
-        <div class="points-label">Points</div>
-        <div class="points-value" id="pointsValue">0</div>
+        <div class="points-label">Your Points</div>
+        <div id="pointsValue" class="points-value">0</div>
       </div>
-
-      <div class="button-group">
-        <button id="checkButton" class="primary-button">Check Current Page</button>
-        <button id="logoutBtn" class="secondary-button">Sign Out</button>
+      <div class="form-group">
+        <button id="checkButton">Check Current Page</button>
+        <button id="scanCartButton">Scan Cart Page</button>
+        <button id="logoutButton">Logout</button>
       </div>
+      <div id="status"></div>
     </div>
-
-    <div id="status"></div>
   </div>
   <script src="config.js"></script>
   <script src="popup.js"></script>

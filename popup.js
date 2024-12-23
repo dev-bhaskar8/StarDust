@@ -21,6 +21,7 @@ const resetPasswordForm = document.getElementById('resetPasswordForm');
 const pointsValue = document.getElementById('pointsValue');
 const statusDiv = document.getElementById('status');
 const checkButton = document.getElementById('checkButton');
+const scanCartButton = document.getElementById('scanCartButton');
 
 // Helper Functions
 function showStatus(message, isError = false) {
@@ -49,72 +50,111 @@ function showSection(section) {
 }
 
 // Function to handle points addition
-function handlePointsAdd(authToken, points) {
-    return fetch(API_ENDPOINTS.POINTS_ADD, {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({ points: points })
-    })
-    .then(response => response.json())
-    .then(data => {
+async function handlePointsAdd(authToken, points) {
+    try {
+        const response = await fetch(API_ENDPOINTS.POINTS_ADD, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ points: points })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
         if (data.points !== undefined) {
             pointsValue.textContent = data.points;
             return data;
         } else {
             throw new Error('No points value in response');
         }
+    } catch (error) {
+        console.error('Points addition error:', error);
+        throw new Error(`Failed to add points: ${error.message}`);
+    }
+}
+
+// Function to check current page for affiliate ID
+async function checkCurrentPage() {
+    chrome.tabs.query({active: true, currentWindow: true}, async function(tabs) {
+        try {
+            if (!tabs[0]) {
+                showStatus('No active tab found', true);
+                return;
+            }
+
+            const response = await chrome.tabs.sendMessage(tabs[0].id, {
+                action: 'checkReferral',
+                associateId: window.appConfig.AMAZON_ASSOCIATE_ID
+            });
+            
+            if (response && response.hasReferral) {
+                // Get auth token and award points
+                chrome.storage.local.get(['authToken'], async function(result) {
+                    if (result.authToken) {
+                        try {
+                            await handlePointsAdd(result.authToken, 1);
+                            showStatus('✅ Referral active! Added 1 point!', false);
+                            await loadUserData(); // Refresh points display
+                        } catch (error) {
+                            console.error('Error adding points:', error);
+                            showStatus(error.message, true);
+                        }
+                    } else {
+                        showStatus('Please log in to add points', true);
+                    }
+                });
+            } else {
+                showStatus('❌ This page does not have your referral link', true);
+            }
+        } catch (error) {
+            showStatus('Error checking referral link', true);
+            console.error('Error:', error);
+        }
     });
 }
 
-// Check current page for affiliate ID
-async function checkCurrentPage() {
-    try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!tab) {
-            showStatus('No active tab found', true);
-            return;
-        }
+// Function to scan for cart page
+async function scanCartPage() {
+    chrome.tabs.query({active: true, currentWindow: true}, async function(tabs) {
+        try {
+            if (!tabs[0]) {
+                showStatus('No active tab found', true);
+                return;
+            }
 
-        // Check if URL is an Amazon URL
-        const url = new URL(tab.url);
-        if (!url.hostname.includes('amazon')) {
-            showStatus('You should be in an Amazon page', true);
-            return;
-        }
-
-        console.log('Sending checkReferral message to tab:', tab.id);
-        const response = await chrome.tabs.sendMessage(tab.id, {
-            action: 'checkReferral',
-            associateId: window.appConfig.AMAZON_ASSOCIATE_ID
-        });
-
-        console.log('Referral check response:', response);
-
-        if (response && response.hasReferral) {
-            chrome.storage.local.get(['authToken'], function(result) {
-                if (result.authToken) {
-                    handlePointsAdd(result.authToken, 1)
-                        .then(data => {
-                            showStatus('\u2713 Referral active! Added 1 point successfully.', false);
-                        })
-                        .catch(error => {
+            const currentUrl = tabs[0].url;
+            if (currentUrl.includes('/gp/buy/spc/handlers/display.html')) {
+                // Get auth token and award points
+                chrome.storage.local.get(['authToken'], async function(result) {
+                    if (result.authToken) {
+                        try {
+                            await handlePointsAdd(result.authToken, 1);
+                            showStatus('✅ Cart page found! Added 1 point!', false);
+                            await loadUserData(); // Refresh points display
+                            // Trigger cart page scan in content script
+                            chrome.tabs.sendMessage(tabs[0].id, { type: 'SCAN_CART_PAGE' });
+                        } catch (error) {
                             console.error('Error adding points:', error);
-                            showStatus('Error adding points: ' + error.message, true);
-                        });
-                } else {
-                    showStatus('Please log in to add points', true);
-                }
-            });
-        } else {
-            showStatus('Affiliate ID is not present on this page', true);
+                            showStatus(error.message, true);
+                        }
+                    } else {
+                        showStatus('Please log in to add points', true);
+                    }
+                });
+            } else {
+                showStatus('❌ This is not the Amazon cart page', true);
+            }
+        } catch (error) {
+            showStatus('Error scanning cart page', true);
+            console.error('Error:', error);
         }
-    } catch (error) {
-        showStatus('You should be in an Amazon page', true);
-        console.error('Error in checkCurrentPage:', error);
-    }
+    });
 }
 
 // Authentication Functions
@@ -305,41 +345,22 @@ document.addEventListener('DOMContentLoaded', function() {
         if (result.authToken) {
             showSection('main');
             loadUserData();
-            updateAssociateId();
         } else {
             showSection('login');
         }
     });
+
+    // Login form event listeners
+    document.getElementById('loginBtn')?.addEventListener('click', login);
+    document.getElementById('signupBtn')?.addEventListener('click', signup);
+    document.getElementById('showSignup')?.addEventListener('click', () => showSection('signup'));
+    document.getElementById('showLogin')?.addEventListener('click', () => showSection('login'));
+    document.getElementById('showForgotPassword')?.addEventListener('click', () => showSection('forgotPassword'));
+    document.getElementById('forgotPasswordBtn')?.addEventListener('click', requestPasswordReset);
+    document.getElementById('resetPasswordBtn')?.addEventListener('click', resetPassword);
+    document.getElementById('logoutButton')?.addEventListener('click', logout);
     
-    // Check for reset password token in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('token')) {
-        showSection('resetPassword');
-    }
-    
-    // Login form
-    document.getElementById('loginBtn').addEventListener('click', login);
-    document.getElementById('showSignup').addEventListener('click', () => showSection('signup'));
-    document.getElementById('showForgotPassword').addEventListener('click', () => showSection('forgotPassword'));
-    
-    // Signup form
-    document.getElementById('signupBtn').addEventListener('click', signup);
-    document.getElementById('showLogin').addEventListener('click', () => showSection('login'));
-    
-    // Forgot Password form
-    document.getElementById('resetBtn').addEventListener('click', requestPasswordReset);
-    document.getElementById('backToLogin').addEventListener('click', () => showSection('login'));
-    
-    // Reset Password form
-    document.getElementById('setPasswordBtn').addEventListener('click', resetPassword);
-    
-    // Main content
-    document.getElementById('logoutBtn').addEventListener('click', logout);
-    document.getElementById('checkButton').addEventListener('click', checkCurrentPage);
-    
-    // Automatically update links when popup opens
-    sendMessageToContentScript({
-        action: 'updateAssociateId',
-        associateId: window.appConfig.AMAZON_ASSOCIATE_ID
-    });
+    // Add event listeners for page check buttons
+    document.getElementById('checkButton')?.addEventListener('click', checkCurrentPage);
+    document.getElementById('scanCartButton')?.addEventListener('click', scanCartPage);
 });
