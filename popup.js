@@ -78,6 +78,13 @@ async function checkCurrentPage() {
             return;
         }
 
+        // Check if URL is an Amazon URL
+        const url = new URL(tab.url);
+        if (!url.hostname.includes('amazon')) {
+            showStatus('You should be in an Amazon page', true);
+            return;
+        }
+
         console.log('Sending checkReferral message to tab:', tab.id);
         const response = await chrome.tabs.sendMessage(tab.id, {
             action: 'checkReferral',
@@ -105,8 +112,8 @@ async function checkCurrentPage() {
             showStatus('Affiliate ID is not present on this page', true);
         }
     } catch (error) {
+        showStatus('You should be in an Amazon page', true);
         console.error('Error in checkCurrentPage:', error);
-        showStatus('Error checking page: ' + error.message, true);
     }
 }
 
