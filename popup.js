@@ -1,5 +1,4 @@
 // Load environment variables
-// const ASSOCIATE_ID = 'bhaskar0d0-21';
 
 // API endpoints
 const API_BASE = 'http://localhost:5001';
@@ -21,21 +20,48 @@ const resetPasswordForm = document.getElementById('resetPasswordForm');
 const pointsValue = document.getElementById('pointsValue');
 const statusDiv = document.getElementById('status');
 const checkButton = document.getElementById('checkButton');
-const scanCartButton = document.getElementById('scanCartButton');
 
 // Helper Functions
 function showStatus(message, isError = false) {
-    statusDiv.textContent = message;
-    statusDiv.className = isError ? 'error' : 'success';
-    statusDiv.style.display = 'block';
+    // Remove any existing status messages
+    const existingStatus = document.querySelector('.status-message');
+    if (existingStatus) {
+        existingStatus.remove();
+    }
+
+    // Create status message element
+    const statusDiv = document.createElement('div');
+    statusDiv.className = `status-message ${isError ? 'error' : 'success'}`;
     
-    // Auto-hide after 3 seconds
+    // Add message text
+    const messageText = document.createElement('span');
+    messageText.textContent = message;
+    statusDiv.appendChild(messageText);
+    
+    // Add close button
+    const closeButton = document.createElement('button');
+    closeButton.className = 'close-btn';
+    closeButton.setAttribute('aria-label', 'Close notification');
+    statusDiv.appendChild(closeButton);
+    
+    // Add to document
+    document.body.appendChild(statusDiv);
+    
+    // Set up close button click handler
+    closeButton.addEventListener('click', () => {
+        statusDiv.remove();
+    });
+    
+    // Auto remove after 60 seconds
     setTimeout(() => {
-        statusDiv.style.display = 'none';
-    }, 3000);
+        if (statusDiv.parentNode) {
+            statusDiv.remove();
+        }
+    }, 60000);
 }
 
 function showSection(section) {
+    console.log(`Showing section: ${section}`);
     loginForm.style.display = 'none';
     signupForm.style.display = 'none';
     mainContent.style.display = 'none';
@@ -51,7 +77,9 @@ function showSection(section) {
 
 // Function to handle points addition
 async function handlePointsAdd(authToken, points) {
+    console.log('Attempting to add points:', points);
     try {
+        console.log('Making request to:', API_ENDPOINTS.POINTS_ADD);
         const response = await fetch(API_ENDPOINTS.POINTS_ADD, {
             method: 'POST',
             headers: { 
@@ -61,12 +89,15 @@ async function handlePointsAdd(authToken, points) {
             body: JSON.stringify({ points: points })
         });
 
+        console.log('Points add response status:', response.status);
         if (!response.ok) {
             const errorData = await response.json();
+            console.error('Points add error response:', errorData);
             throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
+        console.log('Points add success response:', data);
         if (data.points !== undefined) {
             pointsValue.textContent = data.points;
             return data;
@@ -81,25 +112,52 @@ async function handlePointsAdd(authToken, points) {
 
 // Function to check current page for affiliate ID
 async function checkCurrentPage() {
+    console.log('Checking current page for affiliate ID');
     chrome.tabs.query({active: true, currentWindow: true}, async function(tabs) {
         try {
             if (!tabs[0]) {
+                console.error('No active tab found');
                 showStatus('No active tab found', true);
                 return;
             }
 
-            const response = await chrome.tabs.sendMessage(tabs[0].id, {
+            const currentTab = tabs[0];
+            const isAmazonPage = currentTab.url.includes('amazon.');
+            
+            if (!isAmazonPage) {
+                showStatus('This is not an Amazon page', true);
+                return;
+            }
+
+            // Try to inject content script if not already present
+            try {
+                await chrome.scripting.executeScript({
+                    target: { tabId: currentTab.id },
+                    files: ['config.js', 'content.js']
+                });
+                console.log('Content scripts injected');
+            } catch (error) {
+                console.log('Content scripts already present or injection failed:', error);
+            }
+
+            // Wait a bit for content script to initialize
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            console.log('Sending message to content script');
+            const response = await chrome.tabs.sendMessage(currentTab.id, {
                 action: 'checkReferral',
                 associateId: window.appConfig.AMAZON_ASSOCIATE_ID
             });
             
+            console.log('Content script response:', response);
             if (response && response.hasReferral) {
                 // Get auth token and award points
                 chrome.storage.local.get(['authToken'], async function(result) {
+                    console.log('Retrieved auth token:', result.authToken ? 'exists' : 'missing');
                     if (result.authToken) {
                         try {
                             await handlePointsAdd(result.authToken, 1);
-                            showStatus('✅ Referral active! Added 1 point!', false);
+                            showStatus('Success! Referral active - Added 1 point', false);
                             await loadUserData(); // Refresh points display
                         } catch (error) {
                             console.error('Error adding points:', error);
@@ -110,75 +168,47 @@ async function checkCurrentPage() {
                     }
                 });
             } else {
-                showStatus('❌ This page does not have your referral link', true);
+                showStatus('This page does not have your referral link', true);
             }
         } catch (error) {
-            showStatus('Error checking referral link', true);
-            console.error('Error:', error);
-        }
-    });
-}
-
-// Function to scan for cart page
-async function scanCartPage() {
-    chrome.tabs.query({active: true, currentWindow: true}, async function(tabs) {
-        try {
-            if (!tabs[0]) {
-                showStatus('No active tab found', true);
-                return;
-            }
-
-            const currentUrl = tabs[0].url;
-            if (currentUrl.includes('/gp/buy/spc/handlers/display.html')) {
-                // Get auth token and award points
-                chrome.storage.local.get(['authToken'], async function(result) {
-                    if (result.authToken) {
-                        try {
-                            await handlePointsAdd(result.authToken, 1);
-                            showStatus('✅ Cart page found! Added 1 point!', false);
-                            await loadUserData(); // Refresh points display
-                            // Trigger cart page scan in content script
-                            chrome.tabs.sendMessage(tabs[0].id, { type: 'SCAN_CART_PAGE' });
-                        } catch (error) {
-                            console.error('Error adding points:', error);
-                            showStatus(error.message, true);
-                        }
-                    } else {
-                        showStatus('Please log in to add points', true);
-                    }
-                });
+            console.error('Error checking referral link:', error);
+            if (error.message.includes('Receiving end does not exist')) {
+                showStatus('Please refresh the page and try again', true);
             } else {
-                showStatus('❌ This is not the Amazon cart page', true);
+                showStatus('Error checking referral link. Is this an Amazon page?', true);
             }
-        } catch (error) {
-            showStatus('Error scanning cart page', true);
-            console.error('Error:', error);
         }
     });
 }
 
 // Authentication Functions
 async function login() {
+    console.log('Attempting login');
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     
     try {
+        console.log('Making login request to:', API_ENDPOINTS.LOGIN);
         const response = await fetch(API_ENDPOINTS.LOGIN, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
         });
         
+        console.log('Login response status:', response.status);
         const data = await response.json();
         if (response.ok) {
+            console.log('Login successful');
             chrome.storage.local.set({ authToken: data.token });
             showSection('main');
             loadUserData();
             updateAssociateId();
         } else {
+            console.error('Login failed:', data);
             showStatus(data.message || 'Login failed', true);
         }
     } catch (error) {
+        console.error('Network error during login:', error);
         showStatus('Network error', true);
     }
 }
@@ -200,6 +230,60 @@ async function signup() {
             showSection('login');
         } else {
             showStatus(data.message || 'Signup failed', true);
+        }
+    } catch (error) {
+        showStatus('Network error', true);
+    }
+}
+
+// Password Reset Functions
+async function requestPasswordReset() {
+    const email = document.getElementById('forgotEmail').value;
+    
+    try {
+        const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            showStatus('Password reset link sent to your email');
+            showSection('login');
+        } else {
+            showStatus(data.message || 'Failed to send reset link', true);
+        }
+    } catch (error) {
+        showStatus('Network error', true);
+    }
+}
+
+async function resetPassword() {
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    
+    if (newPassword !== confirmPassword) {
+        showStatus('Passwords do not match', true);
+        return;
+    }
+    
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        
+        const response = await fetch(API_ENDPOINTS.RESET_PASSWORD, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, new_password: newPassword })
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            showStatus('Password reset successful');
+            showSection('login');
+        } else {
+            showStatus(data.message || 'Failed to reset password', true);
         }
     } catch (error) {
         showStatus('Network error', true);
@@ -242,102 +326,6 @@ async function loadUserData() {
     }
 }
 
-// Function to send message to content script
-async function sendMessageToContentScript(message) {
-    try {
-        const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
-        
-        if (!tab) {
-            console.error('No active tab found');
-            updateStatus('No active tab found');
-            return { success: false };
-        }
-
-        console.log('Sending message:', message);
-        
-        // Send message to content script
-        return new Promise((resolve) => {
-            chrome.tabs.sendMessage(tab.id, message, (response) => {
-                console.log('Received response:', response);
-                if (chrome.runtime.lastError) {
-                    console.error('Runtime error:', chrome.runtime.lastError);
-                    resolve({ success: false, error: chrome.runtime.lastError });
-                } else {
-                    resolve(response);
-                }
-            });
-        });
-    } catch (error) {
-        console.error('Error sending message:', error);
-        updateStatus('Error: ' + error.message);
-        return { success: false, error: error };
-    }
-}
-
-// Function to update status message
-function updateStatus(message, type = 'warning') {
-    const status = document.getElementById('status');
-    status.textContent = message;
-    status.className = type;
-    status.style.display = 'block';
-    setTimeout(() => {
-        status.style.display = 'none';
-    }, 3000);
-}
-
-// Forgot Password Functions
-async function requestPasswordReset() {
-    const email = document.getElementById('forgotEmail').value;
-    
-    try {
-        const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email })
-        });
-        
-        const data = await response.json();
-        if (response.ok) {
-            showStatus('Password reset link sent to your email');
-            showSection('login');
-        } else {
-            showStatus(data.message || 'Failed to send reset link', true);
-        }
-    } catch (error) {
-        showStatus('Network error', true);
-    }
-}
-
-async function resetPassword() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-    const newPassword = document.getElementById('newPassword').value;
-    const confirmPassword = document.getElementById('confirmPassword').value;
-    
-    if (newPassword !== confirmPassword) {
-        showStatus('Passwords do not match', true);
-        return;
-    }
-    
-    try {
-        const response = await fetch(API_ENDPOINTS.RESET_PASSWORD, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token, new_password: newPassword })
-        });
-        
-        const data = await response.json();
-        if (response.ok) {
-            showStatus('Password reset successful');
-            showSection('login');
-        } else {
-            showStatus(data.message || 'Failed to reset password', true);
-        }
-    } catch (error) {
-        showStatus('Network error', true);
-    }
-}
-
 // Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
     // Check authentication status
@@ -360,7 +348,13 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('resetPasswordBtn')?.addEventListener('click', resetPassword);
     document.getElementById('logoutButton')?.addEventListener('click', logout);
     
-    // Add event listeners for page check buttons
+    // Add event listener for page check button
     document.getElementById('checkButton')?.addEventListener('click', checkCurrentPage);
-    document.getElementById('scanCartButton')?.addEventListener('click', scanCartPage);
+});
+
+// Listen for points updates from background script
+chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+    if (message.type === 'POINTS_UPDATED' && message.points !== undefined) {
+        pointsValue.textContent = message.points;
+    }
 });
