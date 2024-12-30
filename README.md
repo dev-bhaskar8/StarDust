@@ -1,52 +1,59 @@
-# Amazon Referral Link Manager
+# Amazon Affiliate Link & Purchase Tracking Extension
 
-A Chrome extension that automatically replaces Amazon links with your affiliate links while rewarding users with points. When you visit any Amazon page, the extension automatically processes all links, replacing any existing affiliate tags with your Amazon Associate ID while maintaining essential URL parameters and removing unnecessary tracking data. Users earn points for their purchases through these affiliate links.
+A Chrome extension that automatically manages Amazon affiliate links and tracks purchases to award points based on order value.
 
 ## Core Features
 
-- 🔄 **Automatic Link Processing**
-  - Instantly replaces all Amazon links with your affiliate links
-  - No buttons or manual intervention needed
-  - Works on product pages, search results, and category pages
-  - Seamless integration with points tracking system
-
-- 🧹 **Smart URL Cleaning**
+### 🔄 Affiliate Link Management
+- Automatically replaces Amazon links with your affiliate links
+- Works across multiple Amazon domains (amazon.com, amazon.in, amazon.co.uk, amazon.ca)
+- Smart URL cleaning:
   - Preserves essential parameters (node, keywords, product IDs)
   - Removes tracking and unnecessary parameters
   - Maintains clean, functional URLs
-  - Ensures accurate purchase tracking for points
-
-- 🌐 **Multi-Domain Support**
-  - Works across multiple Amazon domains:
-    - amazon.com
-    - amazon.in
-    - amazon.co.uk
-    - amazon.ca
-
-- ✨ **Dynamic Content Handling**
+- Dynamic content handling:
   - Monitors page changes using MutationObserver
   - Processes new links added through AJAX or infinite scroll
   - Real-time updates without page refresh
-  - Instant points balance updates
 
-- 🔍 **Referral Verification**
-  - Built-in check button in popup
-  - Instantly verifies if your referral is active
-  - Clear status messages and feedback
-  - Points transaction history
+### 💎 Purchase Tracking & Points System
 
-- 💎 **Points & Rewards System**
-  - Earn points on every purchase through affiliate links
-  - Real-time points balance tracking
-  - Points awarded based on cart total
-  - Secure points storage and management
-  - Transaction history and analytics
+#### 1. Checkout Page Detection & Monitoring
+- Detects when user is on a checkout page
+- Extracts and stores:
+  - Product descriptions from page text content
+  - Order total in USD
+  - Session ID and timestamp
+- Continuously monitors the page for:
+  - New product descriptions
+  - Changes in order total
+  - Updates stored data when changes are detected
 
-- 🔐 **User Authentication**
-  - Secure email-based registration
-  - JWT token authentication
-  - Password reset functionality
-  - Protected user profiles and points data
+#### 2. Thank You Page Processing
+- Detects Amazon thank you pages
+- Verifies:
+  - Correct affiliate tag
+  - Page is fully loaded
+  - Purchase hasn't been processed before (using content hash)
+- Extracts:
+  - Product descriptions from image alt texts
+  - Order confirmation content for hashing
+
+#### 3. Purchase Validation
+- Matches product descriptions between:
+  - Checkout page (stored text content)
+  - Thank you page (image alt texts)
+- Validates:
+  - Session is less than 30 minutes old
+  - At least one product description matches
+  - Order total is within valid range
+
+#### 4. Points Calculation
+- Awards points based on order total:
+  - 100 points per USD
+  - Minimum: 100 points
+  - Maximum: 10,000 points
+  - Maximum order value: $1,000 USD
 
 ## Technical Implementation
 
@@ -58,7 +65,7 @@ project/
 │   ├── config.js        # Associate ID configuration
 │   ├── popup.html       # Extension popup interface
 │   ├── popup.js         # Popup logic
-│   └── content.js       # Core link processing
+│   └── content.js       # Core functionality
 │
 ├── backend/
 │   ├── app.py          # Flask server implementation
@@ -67,197 +74,81 @@ project/
 │   └── .env.example    # Environment template
 ```
 
-### Key Components
+### Security Features
+- Prevents duplicate points:
+  - Generates unique hash for each purchase
+  - Stores processed hashes with timestamps
+  - Cleans up old hashes after 24 hours
+- Validates affiliate tags
+- Enforces session timeouts
+- Secure user authentication:
+  - JWT token authentication
+  - Protected user profiles
+  - Points data security
 
-#### manifest.json
-Essential permissions and configurations:
-```json
-{
-  "manifest_version": 3,
-  "permissions": ["activeTab", "scripting", "storage", "tabs", "notifications"],
-  "host_permissions": [
-    "*://*.amazon.com/*", 
-    "*://*.amazon.in/*", 
-    "*://*.amazon.co.uk/*", 
-    "*://*.amazon.ca/*",
-    "http://localhost:5001/*"
-  ],
-  "content_scripts": [{
-    "matches": ["*://*.amazon.com/*", "*://*.amazon.in/*", "*://*.amazon.co.uk/*", "*://*.amazon.ca/*"],
-    "js": ["config.js", "content.js"],
-    "run_at": "document_start"
-  }]
-}
-```
+### Content & Data Handling
+- URL Parameter Management:
+  - Preserved: node, th, keywords, dp, psc
+  - Removed: tracking and unnecessary parameters
+- Content Matching:
+  - Checkout page: Extracts meaningful text content
+  - Thank you page: Extracts product descriptions from image alt texts
+  - Uses fuzzy matching to validate purchases
+- Currency Handling:
+  - Supports multiple currencies (INR, USD, EUR, GBP, BRL)
+  - Automatically converts to USD for points calculation
+  - Uses current exchange rates
 
-#### config.js
-Configuration file for your Associate ID and backend URL:
-```javascript
-const config = {
-    AMAZON_ASSOCIATE_ID: 'your-associate-id',  // Your Amazon Associate ID
-    BACKEND_URL: 'http://localhost:5001'       // Backend server URL
-};
-window.appConfig = config;
-```
+### Storage
+- Uses chrome.storage.local for:
+  - Session data
+  - Checkout information
+  - Temporary storage
+- Uses chrome.storage.sync for:
+  - Processed purchase hashes
+  - User preferences
+  - Long-term data
+- Implements fallback mechanisms for storage failures
 
-#### content.js
-Core functionality:
-- URL parameter management
-- Link detection and processing
-- Dynamic content monitoring
-- Message handling with popup
-- Purchase detection for points
-- Authentication state management
-
-#### popup.html/js
-User interface:
-- Check button for referral verification
-- Status message display
-- Automatic link updating
-- Points balance display
-- Login/Registration forms
-- Transaction history
-
-#### Backend (app.py)
-Server implementation:
-- User authentication endpoints
-- Points management system
-- MongoDB integration
-- JWT token handling
-- Email services for password reset
-
-## Setup Instructions
-
-1. Configure Associate ID:
-   - Open `config.js`
-   - Replace 'your-associate-id' with your actual Amazon Associate ID
-   - Update BACKEND_URL if needed
-   - Save the file
-
-2. Backend Setup:
+## Installation & Setup
+1. Configure Backend:
    - Install Python dependencies: `pip install -r requirements.txt`
-   - Copy `.env.example` to `.env`
-   - Configure environment variables:
-     - MongoDB connection string
-     - JWT secret key
-     - SMTP settings for emails
-     - Associate ID
+   - Configure environment variables in `.env`
+   - Start backend server: `python app.py`
 
-3. Load Extension in Chrome:
+2. Configure Extension:
+   - Open `config.js`
+   - Set your Amazon Associate ID
+   - Update backend URL if needed
+
+3. Load Extension:
    - Open Chrome Extensions (chrome://extensions/)
-   - Enable "Developer mode" (top right)
+   - Enable "Developer mode"
    - Click "Load unpacked"
    - Select the extension directory
 
-4. Start Backend Server:
-   ```bash
-   python app.py
-   ```
-
-## How It Works
-
-1. **Initialization**
-   - Extension loads on Amazon domains
-   - Reads Associate ID from config
-   - Sets up page monitors
-   - Checks authentication status
-
-2. **Link Processing**
-   - Detects Amazon links on page
-   - Cleans URL parameters
-   - Adds your Associate ID
-   - Updates link href
-   - Prepares for purchase tracking
-
-3. **Dynamic Updates**
-   - Monitors DOM changes
-   - Processes new links automatically
-   - Updates without page reload
-   - Syncs points balance
-
-4. **Status Checking**
-   - Verifies current page referral
-   - Shows success/warning messages
-   - Displays points balance
-   - Updates transaction history
-
-5. **Points System**
-   - Detects successful purchases
-   - Calculates points based on cart total
-   - Updates user's points balance
-   - Records transaction details
-
-6. **Authentication Flow**
-   - User registration with email
-   - Secure password handling
-   - JWT token management
-   - Password reset process
-
-## URL Parameter Handling
-
-### Preserved Parameters
-- node (Category/browse node ID)
-- th (Product variation)
-- keywords (Search terms)
-- dp (Direct product)
-- psc (Product selection)
-
-### Removed Parameters
-- ref (Creator referral)
-- ref_ (Additional referral)
-- linkCode
-- pd_rd_* (Product discovery)
-- pf_rd_* (Page flow)
-- Other tracking parameters
-
-## Usage Examples
-
-1. **Product Pages**
-   - Opens Amazon product page
-   - Automatically updates product link
-   - Maintains essential parameters
-   - Tracks potential purchase
-
-2. **Search Results**
-   - Updates all product links
-   - Preserves search parameters
-   - Handles pagination
-   - Monitors product clicks
-
-3. **Category Browsing**
-   - Updates category links
-   - Maintains filters and sorting
-   - Processes dynamic loading
-   - Tracks browsing patterns
-
-4. **Points Management**
-   - View current points balance
-   - Check transaction history
-   - Monitor pending points
-   - Track purchase status
+## Development
+- Built with vanilla JavaScript
+- Uses Chrome Extension Manifest V3
+- Implements MutationObserver for dynamic content
+- Backend built with Flask
+- MongoDB for data storage
+- JWT for authentication
 
 ## Best Practices
-
-1. **Configuration**
+1. Configuration:
    - Keep Associate ID in config.js
    - Secure backend credentials
    - Update manifest for new domains
    - Test after configuration changes
 
-2. **Usage**
+2. Usage:
    - Let automatic updates work
    - Use check button to verify
    - Monitor status messages
    - Keep user logged in
 
-3. **Maintenance**
-   - Update extension regularly
-   - Check for Amazon URL changes
-   - Monitor affiliate performance
-   - Backup points database
-   - Monitor authentication logs
-
-4. **Security**
+3. Security:
    - Regular security audits
    - Token rotation
    - Secure password storage
