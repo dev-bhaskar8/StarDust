@@ -239,8 +239,14 @@ async function signup() {
 // Password Reset Functions
 async function requestPasswordReset() {
     const email = document.getElementById('forgotEmail').value;
+    const button = document.getElementById('forgotPasswordBtn');
+    const originalText = button.textContent;
     
     try {
+        // Show loading state
+        button.disabled = true;
+        button.textContent = 'Loading...';
+        
         const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -256,6 +262,10 @@ async function requestPasswordReset() {
         }
     } catch (error) {
         showStatus('Network error', true);
+    } finally {
+        // Restore button state
+        button.disabled = false;
+        button.textContent = originalText;
     }
 }
 
@@ -328,7 +338,37 @@ async function loadUserData() {
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication status
+    // Show login form by default
+    showSection('login');
+
+    // Login form event listeners
+    document.getElementById('loginBtn')?.addEventListener('click', login);
+    document.getElementById('showSignup')?.addEventListener('click', () => showSection('signup'));
+    document.getElementById('showForgotPassword')?.addEventListener('click', () => showSection('forgotPassword'));
+
+    // Signup form event listeners
+    document.getElementById('signupBtn')?.addEventListener('click', signup);
+    document.getElementById('showLogin')?.addEventListener('click', () => showSection('login'));
+
+    // Forgot password form event listeners
+    document.getElementById('forgotPasswordBtn')?.addEventListener('click', requestPasswordReset);
+
+    // Reset password form event listeners
+    document.getElementById('resetPasswordBtn')?.addEventListener('click', resetPassword);
+
+    // Main content event listeners
+    document.getElementById('checkButton')?.addEventListener('click', checkCurrentPage);
+    document.getElementById('logoutButton')?.addEventListener('click', logout);
+
+    // Add click event listeners to all elements with id="showLogin"
+    document.querySelectorAll('[id="showLogin"]').forEach(element => {
+        element.addEventListener('click', (e) => {
+            e.preventDefault();
+            showSection('login');
+        });
+    });
+
+    // Check if user is already logged in
     chrome.storage.local.get(['authToken'], function(result) {
         if (result.authToken) {
             showSection('main');
@@ -337,24 +377,15 @@ document.addEventListener('DOMContentLoaded', function() {
             showSection('login');
         }
     });
-
-    // Login form event listeners
-    document.getElementById('loginBtn')?.addEventListener('click', login);
-    document.getElementById('signupBtn')?.addEventListener('click', signup);
-    document.getElementById('showSignup')?.addEventListener('click', () => showSection('signup'));
-    document.getElementById('showLogin')?.addEventListener('click', () => showSection('login'));
-    document.getElementById('showForgotPassword')?.addEventListener('click', () => showSection('forgotPassword'));
-    document.getElementById('forgotPasswordBtn')?.addEventListener('click', requestPasswordReset);
-    document.getElementById('resetPasswordBtn')?.addEventListener('click', resetPassword);
-    document.getElementById('logoutButton')?.addEventListener('click', logout);
-    
-    // Add event listener for page check button
-    document.getElementById('checkButton')?.addEventListener('click', checkCurrentPage);
 });
 
 // Listen for points updates from background script
 chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     if (message.type === 'POINTS_UPDATED' && message.points !== undefined) {
         pointsValue.textContent = message.points;
+        // Show notification for points earned
+        if (message.pointsEarned) {
+            showStatus(`Congratulations! You earned ${message.pointsEarned} Stardust Points!`, false);
+        }
     }
 });

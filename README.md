@@ -1,6 +1,6 @@
-# Amazon Affiliate Link & Purchase Tracking Extension
+# StarDust - Amazon Affiliate Link & Purchase Tracking Extension
 
-A Chrome extension that automatically manages Amazon affiliate links and tracks purchases to award points based on order value.
+A Chrome extension that automatically manages Amazon affiliate links and tracks purchases to award Stardust points based on order value.
 
 ## Core Features
 
@@ -16,7 +16,7 @@ A Chrome extension that automatically manages Amazon affiliate links and tracks 
   - Processes new links added through AJAX or infinite scroll
   - Real-time updates without page refresh
 
-### 💎 Purchase Tracking & Points System
+### 💎 Purchase Tracking & Stardust Points System
 
 #### 1. Checkout Page Detection & Monitoring
 - Detects when user is on a checkout page
@@ -48,8 +48,8 @@ A Chrome extension that automatically manages Amazon affiliate links and tracks 
   - At least one product description matches
   - Order total is within valid range
 
-#### 4. Points Calculation
-- Awards points based on order total:
+#### 4. Stardust Points Calculation
+- Awards Stardust points based on order total:
   - 100 points per USD
   - Minimum: 100 points
   - Maximum: 10,000 points

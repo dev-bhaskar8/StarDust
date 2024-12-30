@@ -90,6 +90,44 @@ async function updatePopupPoints() {
     }
 }
 
+// When points are updated, send message to popup
+async function updatePoints(points, pointsEarned) {
+    try {
+        // Send message to popup with both total points and points earned
+        chrome.runtime.sendMessage({
+            type: 'POINTS_UPDATED',
+            points: points,
+            pointsEarned: pointsEarned
+        });
+    } catch (error) {
+        console.error('Error sending points update:', error);
+    }
+}
+
+// Update this call in the purchase processing function
+async function processPurchase(orderTotal) {
+    const pointsEarned = calculatePoints(orderTotal);
+    const token = await getAuthToken();
+    
+    try {
+        const response = await fetch(API_ENDPOINTS.POINTS_ADD, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ points: pointsEarned })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            updatePoints(data.points, pointsEarned);  // Pass both values
+        }
+    } catch (error) {
+        console.error('Error processing purchase:', error);
+    }
+}
+
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     console.log('Received message in background:', message);

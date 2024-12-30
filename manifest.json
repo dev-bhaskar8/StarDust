@@ -1,51 +1,37 @@
 {
   "manifest_version": 3,
-  "name": "Amazon Referral Link Manager",
+  "name": "StarDust",
   "version": "1.0",
-  "description": "Amazon affiliate link manager with rewards system",
+  "description": "Track Amazon affiliate links and earn Stardust points",
   "permissions": [
+    "storage",
     "activeTab",
     "scripting",
-    "storage",
-    "tabs",
     "notifications"
   ],
   "host_permissions": [
     "*://*.amazon.com/*",
-    "*://*.amazon.in/*",
     "*://*.amazon.co.uk/*",
     "*://*.amazon.ca/*",
-    "http://localhost:5001/*"
+    "*://*.amazon.in/*"
   ],
-  "content_scripts": [
-    {
-      "matches": [
-        "*://*.amazon.com/*",
-        "*://*.amazon.in/*",
-        "*://*.amazon.co.uk/*",
-        "*://*.amazon.ca/*",
-        "*://*.amazon.com/gp/buy/thankyou*",
-        "*://*.amazon.in/gp/buy/thankyou*",
-        "*://*.amazon.co.uk/gp/buy/thankyou*",
-        "*://*.amazon.ca/gp/buy/thankyou*",
-        "*://*.amazon.com/apay/thank-you*",
-        "*://*.amazon.in/apay/thank-you*",
-        "*://*.amazon.co.uk/apay/thank-you*",
-        "*://*.amazon.ca/apay/thank-you*"
-      ],
-      "js": ["config.js", "content.js"],
-      "run_at": "document_start",
-      "all_frames": false
-    }
-  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
   "background": {
     "service_worker": "background.js"
   },
-  "web_accessible_resources": [{
-    "resources": ["config.js", "content.js"],
-    "matches": ["<all_urls>"]
-  }],
-  "action": {
-    "default_popup": "popup.html"
-  }
+  "content_scripts": [
+    {
+      "matches": ["*://*.amazon.com/*", "*://*.amazon.co.uk/*", "*://*.amazon.ca/*", "*://*.amazon.in/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["config.js", "mouseTrail.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

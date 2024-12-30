@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Amazon Referral Manager</title>
+  <title>StarDust</title>
   <style>
     :root {
       --bg-primary: #1a1b1e;
@@ -32,10 +32,34 @@
     .container {
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      margin-top: 60px;
-      padding: 20px;
+      gap: 15px;
       position: relative;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--bg-secondary);
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-primary);
+    }
+
+    .sparkle {
+      color: var(--accent-primary);
+      animation: twinkle 1.5s infinite;
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
     }
 
     .form-group {
@@ -80,20 +104,17 @@
     }
 
     #status {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-      right: 20px;
+      position: relative;
       padding: 12px;
       border-radius: 8px;
       display: none;
       animation: slideIn 0.3s ease-out;
-      z-index: 1000;
+      margin-top: 10px;
     }
 
     @keyframes slideIn {
       from {
-        transform: translateY(100%);
+        transform: translateY(-10px);
         opacity: 0;
       }
       to {
@@ -140,6 +161,9 @@
       text-align: center;
       margin-bottom: 15px;
       border: 1px solid var(--bg-secondary);
+      position: relative;
+      overflow: hidden;
+      min-height: 100px;
     }
 
     .points-label {
@@ -153,6 +177,7 @@
       font-weight: 700;
       color: var(--accent-primary);
       text-shadow: 0 0 20px rgba(79, 70, 229, 0.2);
+      animation: twinkle 1.5s infinite;
     }
 
     h2 {
@@ -170,20 +195,16 @@
     }
 
     .status-message {
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
+      position: relative;
       padding: 10px 35px 10px 15px;
       border-radius: 4px;
       background-color: #4CAF50;
       color: white;
-      z-index: 1000;
       display: flex;
       align-items: center;
       box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-      max-width: 90%;
-      margin-bottom: 60px;
+      width: 100%;
+      margin-top: 10px;
     }
 
     .status-message .close-btn {
@@ -227,10 +248,68 @@
     .status-message.success {
       background-color: #4CAF50;
     }
+
+    /* Page Transitions */
+    #loginForm, #signupForm, #forgotPasswordForm, #resetPasswordForm, #mainContent {
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Mouse Trail Effect */
+    .stardust-particle {
+      pointer-events: none;
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      z-index: 1;
+      animation: starfall 2s ease-in forwards;
+      color: var(--accent-primary);
+      filter: drop-shadow(0 0 2px var(--accent-primary));
+    }
+
+    .stardust-particle svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    @keyframes starfall {
+      0% {
+        opacity: 0;
+        transform: translateY(0) scale(1) rotate(0deg);
+      }
+      10% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(300px) scale(0.3) rotate(360deg);
+      }
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    <!-- Header with StarDust branding -->
+    <div class="header">
+      <div class="logo">
+        StarDust <span class="sparkle">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+          </svg>
+        </span>
+      </div>
+    </div>
+
     <div id="authSection">
       <!-- Login form -->
       <div id="loginForm" style="display: none;">
@@ -242,6 +321,7 @@
         </div>
         <p>Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
         <p><a href="#" id="showForgotPassword">Forgot Password?</a></p>
+        <div id="loginStatus" class="status"></div>
       </div>
       
       <!-- Signup form -->
@@ -253,6 +333,7 @@
           <button id="signupBtn">Create Account</button>
         </div>
         <p>Already have an account? <a href="#" id="showLogin">Sign in</a></p>
+        <div id="signupStatus" class="status"></div>
       </div>
 
       <!-- Forgot Password form -->
@@ -263,6 +344,7 @@
           <button id="forgotPasswordBtn">Send Reset Link</button>
         </div>
         <p><a href="#" id="showLogin">Back to Login</a></p>
+        <div id="forgotStatus" class="status"></div>
       </div>
 
       <!-- Reset Password form -->
@@ -273,23 +355,26 @@
           <input type="password" id="confirmPassword" placeholder="Confirm Password" autocomplete="new-password">
           <button id="resetPasswordBtn">Reset Password</button>
         </div>
+        <p><a href="#" id="showLogin">Back to Login</a></p>
+        <div id="resetStatus" class="status"></div>
       </div>
     </div>
 
     <!-- Main content -->
     <div id="mainContent" style="display: none;">
       <div class="points-container">
-        <div class="points-label">Your Points</div>
+        <div class="points-label">Your Stardust Points</div>
         <div id="pointsValue" class="points-value">0</div>
       </div>
       <div class="form-group">
         <button id="checkButton">Check Current Page</button>
         <button id="logoutButton">Logout</button>
       </div>
-      <div id="status"></div>
+      <div id="mainStatus" class="status"></div>
     </div>
   </div>
   <script src="config.js"></script>
   <script src="popup.js"></script>
+  <script src="mouseTrail.js"></script>
 </body>
 </html>
