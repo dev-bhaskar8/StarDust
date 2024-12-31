@@ -3,6 +3,11 @@
   "name": "StarDust",
   "version": "1.0",
   "description": "Track Amazon affiliate links and earn Stardust points",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "permissions": [
     "storage",
     "activeTab",
@@ -16,22 +21,39 @@
     "*://*.amazon.in/*"
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   },
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["*://*.amazon.com/*", "*://*.amazon.co.uk/*", "*://*.amazon.ca/*", "*://*.amazon.in/*"],
-      "js": ["content.js"],
+      "matches": [
+        "*://*.amazon.com/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.in/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_end"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["config.js", "mouseTrail.js"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "config.js",
+        "mouseTrail.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }
