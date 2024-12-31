@@ -18,7 +18,6 @@ function hasAssociateId(url, associateId) {
 
 // Function to update Amazon URL with new Associate ID and clean tracking
 function updateAmazonLink(url, associateId) {
-    console.log('Updating Amazon link:', url);
     try {
         const urlObj = new URL(url);
         const newParams = new URLSearchParams();
@@ -53,7 +52,6 @@ function updateAmazonLink(url, associateId) {
         // Reconstruct URL with only essential parameters
         urlObj.search = newParams.toString();
         
-        console.log('Updated URL:', urlObj.toString());
         return urlObj.toString();
     } catch (e) {
         console.error('Error updating URL:', e);
@@ -63,7 +61,6 @@ function updateAmazonLink(url, associateId) {
 
 // Function to update all Amazon links on the page
 function updateAllLinks(associateId) {
-    console.log('Updating all links with Associate ID:', associateId);
     if (!associateId) {
         console.warn('No Associate ID provided');
         return;
@@ -84,7 +81,6 @@ function updateAllLinks(associateId) {
     
     // If we're on an Amazon page, update the current URL
     if (window.location.href.includes('amazon')) {
-        console.log('On Amazon page, updating current URL');
         const currentUrl = window.location.href;
         const newUrl = updateAmazonLink(currentUrl, associateId);
         if (currentUrl !== newUrl) {
@@ -534,9 +530,33 @@ function calculatePoints(orderTotal) {
     return finalPoints;
 }
 
+// Function to check if current page is a checkout page
+function isCheckoutPage(url) {
+    const checkoutPatterns = [
+        '/gp/buy/payselect/handlers/display.html',  // Payselect page
+        '/gp/buy/spc/',                            // Shopping cart
+        '/gp/buy/payselect/',                      // Payment selection
+        '/checkout/',                              // General checkout
+        '/buy/',                                   // Buy pages
+        '/payment/',                               // Payment pages
+        '/order/'                                  // Order pages
+    ];
+    
+    return checkoutPatterns.some(pattern => url.includes(pattern));
+}
+
 // Function to store checkout data
 function storeCheckoutData() {
     console.log('=== Storing Checkout Data ===');
+    const currentUrl = window.location.href;
+    
+    // Check if this is a checkout page
+    if (!isCheckoutPage(currentUrl)) {
+        console.log('Not a checkout page, skipping data storage');
+        return;
+    }
+    
+    console.log('Detected checkout page:', currentUrl);
     const descriptions = extractPageAsins(); // This now returns descriptions
     console.log('Found descriptions on checkout page:', descriptions);
     
@@ -544,11 +564,11 @@ function storeCheckoutData() {
     console.log('Found order total:', orderTotal);
     
     const sessionData = {
-        descriptions, // Store descriptions instead of ASINs
+        descriptions,
         orderTotal,
         timestamp: Date.now(),
         sessionId: generateSessionId(),
-        url: window.location.href
+        url: currentUrl
     };
     console.log('Created session data:', sessionData);
 
@@ -683,62 +703,32 @@ function validateAndProcessPurchase(thankYouDescriptions, contentHash) {
 
 // Modify trackPurchase function to handle observer cleanup
 async function trackPurchase() {
-    console.log('=== Starting Purchase Check ===');
-    console.log('Current URL:', window.location.href);
-    
-    // Clean up any existing observer
-    if (window.asinObserver) {
-        console.log('Cleaning up previous ASIN observer');
-        window.asinObserver.disconnect();
-        window.asinObserver = null;
-    }
-    
+    const isThankYouPage = window.location.pathname.includes('/buy/thankyou');
     const currentUrl = window.location.href;
-    
-    // Check thank you page first (more specific patterns)
-    const isThankYouPage = currentUrl.includes('/gp/buy/thankyou') || 
-                          currentUrl.includes('/buy/thankyou') ||
-                          currentUrl.includes('/thankyou/handlers/display.html') ||
-                          currentUrl.includes('/apay/thank-you');
-
-    // Only check for checkout if it's not a thank you page
-    const isCheckoutPage = !isThankYouPage && (
-        currentUrl.includes('/gp/buy/spc/') || 
-        currentUrl.includes('/gp/buy/payselect/') ||
-        currentUrl.includes('/checkout/') ||
-        currentUrl.includes('/buy/') ||
-        currentUrl.includes('/payment/') ||
-        currentUrl.includes('/order/')
-    );
-
-    console.log('Page type:', isThankYouPage ? 'Thank You' : isCheckoutPage ? 'Checkout' : 'Other');
-
-    // Store ASINs and total for checkout pages
-    if (isCheckoutPage) {
-        console.log('Processing checkout page...');
-        console.log('URL patterns matched:', {
-            buySpc: currentUrl.includes('/gp/buy/spc/'),
-            buyPayselect: currentUrl.includes('/gp/buy/payselect/'),
-            checkout: currentUrl.includes('/checkout/'),
-            buy: currentUrl.includes('/buy/'),
-            payment: currentUrl.includes('/payment/'),
-            order: currentUrl.includes('/order/')
-        });
-        storeCheckoutData();
-        return;
-    }
     
     if (isThankYouPage) {
         console.log('Processing thank you page...');
         
         try {
+            // Get config from Chrome storage
+            const config = await new Promise((resolve) => {
+                chrome.storage.local.get('appConfig', (result) => {
+                    resolve(result.appConfig);
+                });
+            });
+
+            if (!config || !config.AMAZON_ASSOCIATE_ID) {
+                console.log('❌ Error: Configuration not found');
+                return;
+            }
+
             // Check affiliate tag
             const urlObj = new URL(currentUrl);
             const currentTag = urlObj.searchParams.get('tag');
             console.log('Found affiliate tag:', currentTag);
-            console.log('Expected affiliate tag:', window.appConfig.AMAZON_ASSOCIATE_ID);
+            console.log('Expected affiliate tag:', config.AMAZON_ASSOCIATE_ID);
             
-            if (currentTag !== window.appConfig.AMAZON_ASSOCIATE_ID) {
+            if (currentTag !== config.AMAZON_ASSOCIATE_ID) {
                 console.log('❌ Points denied: Wrong affiliate tag');
                 return;
             }
@@ -822,13 +812,28 @@ function sendPurchaseMessage(purchaseHash, points = 100) {
 
 // Only run on complete page load
 window.addEventListener('load', function() {
-    console.log('Window Loaded - Running purchase tracking');
-    // Wait for any dynamic content to load
-    setTimeout(() => {
-        if (document.readyState === 'complete') {
-            trackPurchase();
-        }
-    }, 2000);
+    console.log('Window Loaded - Running checks');
+    const currentUrl = window.location.href;
+    
+    // Check for thank you page
+    if (window.location.pathname.includes('/buy/thankyou')) {
+        console.log('Detected thank you page - Running purchase tracking');
+        setTimeout(() => {
+            if (document.readyState === 'complete') {
+                trackPurchase();
+            }
+        }, 2000);
+    }
+    
+    // Check for checkout page
+    if (isCheckoutPage(currentUrl)) {
+        console.log('Detected checkout page - Running checkout tracking');
+        setTimeout(() => {
+            if (document.readyState === 'complete') {
+                storeCheckoutData();
+            }
+        }, 2000);
+    }
 });
 
 // Initialize: Load Associate ID and set up observers
