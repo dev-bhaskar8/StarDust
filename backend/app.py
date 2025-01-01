@@ -296,5 +296,47 @@ def admin_get_points(email):
     except Exception as e:
         return jsonify({'message': f'Error: {str(e)}'}), 500
 
+@app.route('/wallet', methods=['GET'])
+@jwt_required()
+def get_wallet():
+    try:
+        current_user = get_jwt_identity()
+        user = users.find_one({'email': current_user})
+        
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+            
+        return jsonify({'wallet': user.get('wallet_address', '')}), 200
+        
+    except Exception as e:
+        print(f"Error in get_wallet: {str(e)}")
+        return jsonify({'message': 'Internal server error'}), 500
+
+@app.route('/wallet', methods=['POST'])
+@jwt_required()
+def save_wallet():
+    try:
+        current_user = get_jwt_identity()
+        data = request.get_json()
+        wallet = data.get('wallet')
+        
+        if not wallet:
+            return jsonify({'message': 'Wallet address is required'}), 400
+            
+        # Update user's wallet address
+        result = users.update_one(
+            {'email': current_user},
+            {'$set': {'wallet_address': wallet}}
+        )
+        
+        if result.modified_count == 0:
+            return jsonify({'message': 'User not found or no changes made'}), 404
+            
+        return jsonify({'message': 'Wallet address saved successfully'}), 200
+        
+    except Exception as e:
+        print(f"Error in save_wallet: {str(e)}")
+        return jsonify({'message': 'Internal server error'}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

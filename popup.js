@@ -11,6 +11,85 @@ const API_ENDPOINTS = {
     RESET_PASSWORD: `${API_BASE}/auth/reset-password`
 };
 
+// Stardust Animation
+function createStardustAnimation() {
+    const container = document.querySelector('.stardust-container');
+    const numberOfStars = 50;
+    let animationRunning = false;
+    let starInterval = null;
+    let positions = Array.from({length: 10}, (_, i) => i * 10);
+    
+    function createStar() {
+        if (!animationRunning) return;
+        
+        const star = document.createElement('div');
+        star.className = 'stardust';
+        
+        // Get a random position zone and add some randomness within it
+        const zoneIndex = Math.floor(Math.random() * positions.length);
+        const basePosition = positions[zoneIndex];
+        const position = basePosition + Math.random() * 10;
+        
+        star.style.left = `${position}%`;
+        
+        // Randomize fall duration slightly for natural effect
+        const fallDuration = 2.5 + Math.random() * 0.8;
+        star.style.animationDuration = `${fallDuration}s`;
+        
+        container.appendChild(star);
+        
+        // Remove star after animation completes
+        setTimeout(() => {
+            if (star && star.parentNode) {
+                star.remove();
+            }
+        }, fallDuration * 1000);
+    }
+    
+    function startAnimation() {
+        if (animationRunning) return;
+        
+        animationRunning = true;
+        container.style.opacity = '1';
+        
+        // Create stars gradually
+        starInterval = setInterval(() => {
+            if (container.childNodes.length < numberOfStars) {
+                createStar();
+            }
+        }, 100);
+    }
+    
+    function stopAnimation() {
+        animationRunning = false;
+        
+        if (starInterval) {
+            clearInterval(starInterval);
+            starInterval = null;
+        }
+    }
+    
+    // Add mouse enter/leave listeners
+    document.body.addEventListener('mouseenter', startAnimation);
+    document.body.addEventListener('mouseleave', stopAnimation);
+    
+    // Handle visibility changes
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopAnimation();
+            container.innerHTML = '';
+        }
+    });
+    
+    // Cleanup function
+    return function cleanup() {
+        document.body.removeEventListener('mouseenter', startAnimation);
+        document.body.removeEventListener('mouseleave', stopAnimation);
+        stopAnimation();
+        container.innerHTML = '';
+    };
+}
+
 // DOM Elements
 const loginForm = document.getElementById('loginForm');
 const signupForm = document.getElementById('signupForm');
@@ -23,42 +102,38 @@ const checkButton = document.getElementById('checkButton');
 
 // Helper Functions
 function showStatus(message, isError = false) {
-    // Remove any existing status messages
-    const existingStatus = document.querySelector('.status-message');
-    if (existingStatus) {
-        existingStatus.remove();
+    const statusDiv = document.getElementById('status');
+    const statusContent = statusDiv.querySelector('.status-content');
+    
+    // Clear any existing timeout
+    if (window.statusTimeout) {
+        clearTimeout(window.statusTimeout);
     }
-
-    // Create status message element
-    const statusDiv = document.createElement('div');
-    statusDiv.className = `status-message ${isError ? 'error' : 'success'}`;
     
-    // Add message text
-    const messageText = document.createElement('span');
-    messageText.textContent = message;
-    statusDiv.appendChild(messageText);
+    // Update content and styling
+    statusContent.textContent = message;
+    statusDiv.className = isError ? 'error' : 'success';
     
-    // Add close button
-    const closeButton = document.createElement('button');
-    closeButton.className = 'close-btn';
-    closeButton.setAttribute('aria-label', 'Close notification');
-    statusDiv.appendChild(closeButton);
+    // Show the status
+    statusDiv.style.display = 'flex';
     
-    // Add to document
-    document.body.appendChild(statusDiv);
-    
-    // Set up close button click handler
-    closeButton.addEventListener('click', () => {
-        statusDiv.remove();
-    });
-    
-    // Auto remove after 60 seconds
-    setTimeout(() => {
-        if (statusDiv.parentNode) {
-            statusDiv.remove();
+    // Auto hide after 8 seconds
+    window.statusTimeout = setTimeout(() => {
+        if (statusDiv.style.display === 'flex') {
+            statusDiv.style.display = 'none';
         }
-    }, 60000);
+    }, 8000);
 }
+
+// Add click handler for close button
+document.querySelector('.status-close').addEventListener('click', () => {
+    const statusDiv = document.getElementById('status');
+    statusDiv.style.display = 'none';
+    // Clear any existing timeout on manual close
+    if (window.statusTimeout) {
+        clearTimeout(window.statusTimeout);
+    }
+});
 
 function showSection(section) {
     console.log(`Showing section: ${section}`);
@@ -326,6 +401,118 @@ async function loadUserData() {
     }
 }
 
+// Format wallet address for display (4tXX...XNDn format)
+function formatWalletAddress(address) {
+    if (!address) return '';
+    return `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
+
+// Load wallet address on startup
+async function loadWalletAddress() {
+    try {
+        const token = await new Promise(resolve => {
+            chrome.storage.local.get(['authToken'], result => resolve(result.authToken));
+        });
+        
+        if (!token) return;
+        
+        const response = await fetch(`${API_BASE}/wallet`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const walletInput = document.getElementById('walletAddress');
+            const saveWalletBtn = document.getElementById('saveWalletBtn');
+            
+            if (data.wallet) {
+                walletInput.dataset.fullAddress = data.wallet; // Store full address
+                walletInput.value = formatWalletAddress(data.wallet); // Show truncated
+                walletInput.disabled = true;
+                saveWalletBtn.textContent = 'Change Wallet';
+            } else {
+                walletInput.disabled = false;
+                walletInput.dataset.fullAddress = '';
+                saveWalletBtn.textContent = 'Save Wallet';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading wallet address:', error);
+    }
+}
+
+// Save wallet address
+async function saveWalletAddress() {
+    const walletInput = document.getElementById('walletAddress');
+    const saveWalletBtn = document.getElementById('saveWalletBtn');
+    
+    // If wallet is disabled and button says "Change Wallet", enable editing
+    if (walletInput.disabled && saveWalletBtn.textContent === 'Change Wallet') {
+        walletInput.disabled = false;
+        walletInput.value = walletInput.dataset.fullAddress || ''; // Show full address for editing
+        walletInput.focus();
+        saveWalletBtn.textContent = 'Save Wallet';
+        return;
+    }
+    
+    const walletAddress = walletInput.value.trim();
+    
+    // Basic Solana address validation (should be 32-44 characters)
+    if (!walletAddress.match(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/)) {
+        showStatus('Please enter a valid Solana wallet address', true);
+        return;
+    }
+
+    try {
+        const token = await new Promise(resolve => {
+            chrome.storage.local.get(['authToken'], result => resolve(result.authToken));
+        });
+        
+        if (!token) {
+            showStatus('Please log in first', true);
+            return;
+        }
+        
+        const response = await fetch(`${API_BASE}/wallet`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ wallet: walletAddress })
+        });
+        
+        let data;
+        try {
+            data = await response.json();
+        } catch (e) {
+            console.error('Failed to parse response:', e);
+            showStatus('Server error. Please try again later.', true);
+            return;
+        }
+        
+        if (response.ok) {
+            showStatus('Wallet address saved successfully');
+            walletInput.dataset.fullAddress = walletAddress; // Store full address
+            walletInput.value = formatWalletAddress(walletAddress); // Show truncated
+            walletInput.disabled = true;
+            saveWalletBtn.textContent = 'Change Wallet';
+        } else {
+            showStatus(data?.message || 'Failed to save wallet address', true);
+            
+            // If error is "User not found or no changes made", maintain the view-only state
+            if (data?.message === 'User not found or no changes made') {
+                walletInput.value = formatWalletAddress(walletInput.dataset.fullAddress); // Revert to truncated
+                walletInput.disabled = true;
+                saveWalletBtn.textContent = 'Change Wallet';
+            }
+        }
+    } catch (error) {
+        console.error('Error saving wallet address:', error);
+        showStatus('Network error while saving wallet address. Please check your connection.', true);
+    }
+}
+
 // Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
     // Check authentication status
@@ -333,9 +520,53 @@ document.addEventListener('DOMContentLoaded', function() {
         if (result.authToken) {
             showSection('main');
             loadUserData();
+            loadWalletAddress();
         } else {
             showSection('login');
         }
+    });
+
+    // Add wallet copy functionality
+    let copyTimeout = null;
+    const walletGroup = document.querySelector('.wallet-group');
+    
+    walletGroup.addEventListener('click', function() {
+        const walletInput = document.getElementById('walletAddress');
+        const fullAddress = walletInput.dataset.fullAddress;
+        
+        // Only proceed if we have a wallet address and input is disabled (view mode)
+        if (!fullAddress || !walletInput.disabled) {
+            return;
+        }
+        
+        // Clear any existing timeout
+        if (copyTimeout) {
+            clearTimeout(copyTimeout);
+            copyTimeout = null;
+        }
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(fullAddress).then(function() {
+            // Store current state
+            const originalText = walletInput.value;
+            const originalColor = walletInput.style.color;
+            
+            // Show copied state
+            walletInput.value = 'Copied!';
+            walletInput.style.color = 'var(--accent-primary)';
+            
+            // Set timeout to revert
+            copyTimeout = setTimeout(function() {
+                if (walletInput) {
+                    walletInput.value = originalText;
+                    walletInput.style.color = originalColor;
+                }
+                copyTimeout = null;
+            }, 3000);
+        }).catch(function(err) {
+            console.error('Failed to copy:', err);
+            showStatus('Failed to copy to clipboard', true);
+        });
     });
 
     // Login form event listeners
@@ -350,6 +581,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add event listener for page check button
     document.getElementById('checkButton')?.addEventListener('click', checkCurrentPage);
+
+    // Add wallet save button listener
+    document.getElementById('saveWalletBtn')?.addEventListener('click', saveWalletAddress);
+
+    createStardustAnimation();
 });
 
 // Listen for points updates from background script
