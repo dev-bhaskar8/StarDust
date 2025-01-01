@@ -198,8 +198,9 @@
     .points-value {
       font-size: 32px;
       font-weight: 700;
-      color: var(--accent-primary);
-      text-shadow: 0 0 20px rgba(79, 70, 229, 0.2);
+      color: var(--star-color);
+      text-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+      animation: starPulse 2s infinite;
     }
 
     h2 {
@@ -212,7 +213,6 @@
     p {
       font-size: 14px;
       color: var(--text-secondary);
-      text-align: center;
       margin-top: 15px;
     }
 
@@ -404,6 +404,7 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       pointer-events: none;
+      color: var(--text-secondary);
     }
 
     .wallet-group {
@@ -431,6 +432,31 @@
     .copy-indicator.show {
       opacity: 1;
     }
+
+    .welcome-section {
+      text-align: left;
+      margin-bottom: 20px;
+      margin-top: -15px;
+    }
+
+    .welcome-section h2 {
+      margin-bottom: 8px;
+      font-size: 24px;
+    }
+
+    .user-email {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin: 0;
+      text-align: left;
+      padding-left: 5px;
+    }
+
+    p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-top: 15px;
+    }
   </style>
 </head>
 <body>
@@ -450,7 +476,7 @@
     <div id="authSection">
       <!-- Login form -->
       <div id="loginForm" style="display: none;">
-        <h2>Welcome Back</h2>
+        <h2>Shop online and earn StarDust to redeem them for crypto!</h2>
         <div class="form-group">
           <input type="email" id="email" placeholder="Email" autocomplete="email">
           <input type="password" id="password" placeholder="Password" autocomplete="current-password">
@@ -494,8 +520,12 @@
 
     <!-- Main content -->
     <div id="mainContent" style="display: none;">
+      <div class="welcome-section">
+        <h2>Welcome Back</h2>
+        <p id="userEmail" class="user-email"></p>
+      </div>
       <div class="points-container">
-        <div class="points-label">Your Points</div>
+        <div class="points-label">Your StarDust</div>
         <div id="pointsValue" class="points-value">0</div>
       </div>
       <div class="form-group" style="margin-bottom: 8px;">

@@ -395,6 +395,13 @@ async function loadUserData() {
         if (response.ok) {
             const data = await response.json();
             pointsValue.textContent = data.points;
+            // Get the current user's email from the JWT token
+            const tokenData = JSON.parse(atob(token.split('.')[1]));
+            const userEmail = tokenData.sub; // JWT standard uses 'sub' for subject (user identifier)
+            document.getElementById('userEmail').textContent = userEmail;
+            
+            // Load wallet address right after loading points
+            await loadWalletAddress();
         }
     } catch (error) {
         console.error('Error loading user data:', error);
@@ -584,6 +591,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Add wallet save button listener
     document.getElementById('saveWalletBtn')?.addEventListener('click', saveWalletAddress);
+
+    // Add event listener for the "Back to Login" link in forgot password form
+    document.querySelector('#forgotPasswordForm a[href="#"]')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        showSection('login');
+    });
 
     createStardustAnimation();
 });
