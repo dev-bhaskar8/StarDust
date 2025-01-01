@@ -214,6 +214,10 @@ function getPageContentHash() {
 
 // Function to check if purchase was already processed
 async function isProcessedPurchase(contentHash) {
+    // Temporarily disabled duplicate purchase checking
+    return false;
+    
+    /* Original code commented out
     return new Promise((resolve) => {
         chrome.storage.sync.get(['processedHashes'], function(result) {
             const now = Date.now();
@@ -283,6 +287,7 @@ async function isProcessedPurchase(contentHash) {
             });
         });
     });
+    */
 }
 
 // Helper to generate session ID
