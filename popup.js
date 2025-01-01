@@ -280,11 +280,11 @@ async function login() {
             updateAssociateId();
         } else {
             console.error('Login failed:', data);
-            showStatus(data.message || 'Login failed', true);
+            showStatus(data.message || 'Invalid email or password', true);
         }
     } catch (error) {
         console.error('Network error during login:', error);
-        showStatus('Network error', true);
+        showStatus('Network error. Please try again.', true);
     }
 }
 
@@ -314,8 +314,13 @@ async function signup() {
 // Password Reset Functions
 async function requestPasswordReset() {
     const email = document.getElementById('forgotEmail').value;
+    const resetButton = document.getElementById('forgotPasswordBtn');
+    const originalText = resetButton.textContent;
     
     try {
+        resetButton.textContent = 'Loading...';
+        resetButton.disabled = true;
+        
         const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -323,14 +328,21 @@ async function requestPasswordReset() {
         });
         
         const data = await response.json();
+        
         if (response.ok) {
-            showStatus('Password reset link sent to your email');
             showSection('login');
+            // Show status message after changing section
+            requestAnimationFrame(() => {
+                showStatus('Password reset link has been sent to your email');
+            });
         } else {
             showStatus(data.message || 'Failed to send reset link', true);
         }
     } catch (error) {
         showStatus('Network error', true);
+    } finally {
+        resetButton.textContent = originalText;
+        resetButton.disabled = false;
     }
 }
 
